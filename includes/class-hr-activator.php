@@ -24,6 +24,11 @@ class Headless_Redirector_Activator {
         if ( false === get_option( 'hr_excluded_paths' ) ) {
             update_option( 'hr_excluded_paths', "graphql\nwp-content\nwp-login\nwp-json" );
         }
+        
+        // Set default critical paths (always accessible, even in Full Site Redirect mode)
+        if ( false === get_option( 'hr_critical_paths' ) ) {
+            update_option( 'hr_critical_paths', "wp-admin/*\nwp-login.php\nwp-json/*\nwp-content/*\nwp-includes/*\nwp-cron.php" );
+        }
 	}
 
 }

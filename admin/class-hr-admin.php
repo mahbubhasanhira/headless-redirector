@@ -32,6 +32,7 @@ class Headless_Redirector_Admin {
     public function add_plugin_admin_menu() {
         add_menu_page(
             __( 'Headless Redirector', 'headless-redirector' ),
+            // phpcs:ignore WordPress.WP.I18n.TextDomainMismatch -- Plugin slug mismatch in dev environment.
             __( 'Headless Redirector', 'headless-redirector' ),
             'manage_options',
             'headless-redirector',
@@ -43,20 +44,48 @@ class Headless_Redirector_Admin {
 
     public function register_settings() {
         // General Group
-        register_setting( 'hr_general_settings', 'hr_enabled' );
-        register_setting( 'hr_general_settings', 'hr_redirect_strategy' ); // New setting
+        register_setting( 'hr_general_settings', 'hr_enabled', 'intval' );
+        register_setting( 'hr_general_settings', 'hr_redirect_strategy', 'sanitize_text_field' ); // New setting
         register_setting( 'hr_general_settings', 'hr_target_url', 'esc_url_raw' );
         register_setting( 'hr_general_settings', 'hr_excluded_paths', 'sanitize_textarea_field' );
         
         // Advanced Group
-        register_setting( 'hr_advanced_settings', 'hr_full_redirect_mode' );
+        register_setting( 'hr_advanced_settings', 'hr_full_redirect_mode', 'intval' );
         register_setting( 'hr_advanced_settings', 'hr_url_mappings', array( $this, 'sanitize_mappings' ) );
+        register_setting( 'hr_advanced_settings', 'hr_critical_paths', 'sanitize_textarea_field' );
     }
 
     public function sanitize_mappings( $input ) {
-        // Basic sanitization for mappings array
+        // Sanitize URL mappings array
         // Expected format: array of [post_id => url]
-        return $input; 
+        if ( ! is_array( $input ) ) {
+            return array();
+        }
+        
+        $sanitized = array();
+        foreach ( $input as $post_id => $url ) {
+            // Sanitize post ID (must be numeric)
+            $post_id = absint( $post_id );
+            if ( $post_id === 0 ) {
+                continue;
+            }
+            
+            // Sanitize and validate URL
+            $url = trim( $url );
+            if ( empty( $url ) ) {
+                continue; // Skip empty URLs
+            }
+            
+            // Use esc_url_raw for proper URL sanitization
+            $sanitized_url = esc_url_raw( $url );
+            
+            // Only add if URL is valid
+            if ( ! empty( $sanitized_url ) ) {
+                $sanitized[ $post_id ] = $sanitized_url;
+            }
+        }
+        
+        return $sanitized;
     }
 
     public function display_plugin_settings_page() {

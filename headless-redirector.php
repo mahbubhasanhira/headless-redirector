@@ -20,7 +20,7 @@ if ( ! defined( 'WPINC' ) ) {
 /**
  * The code that runs during plugin activation.
  */
-function activate_headless_redirector() {
+function hr_activate_plugin() {
 	require_once plugin_dir_path( __FILE__ ) . 'includes/class-hr-activator.php';
 	Headless_Redirector_Activator::activate();
 }
@@ -28,13 +28,13 @@ function activate_headless_redirector() {
 /**
  * The code that runs during plugin deactivation.
  */
-function deactivate_headless_redirector() {
+function hr_deactivate_plugin() {
 	require_once plugin_dir_path( __FILE__ ) . 'includes/class-hr-deactivator.php';
 	Headless_Redirector_Deactivator::deactivate();
 }
 
-register_activation_hook( __FILE__, 'activate_headless_redirector' );
-register_deactivation_hook( __FILE__, 'deactivate_headless_redirector' );
+register_activation_hook( __FILE__, 'hr_activate_plugin' );
+register_deactivation_hook( __FILE__, 'hr_deactivate_plugin' );
 
 /**
  * The core plugin class that is used to define internationalization,
@@ -47,7 +47,7 @@ require plugin_dir_path( __FILE__ ) . 'admin/class-hr-admin.php';
 /**
  * Begs execution of the plugin.
  */
-function run_headless_redirector() {
+function hr_run_plugin() {
 
     $plugin_name = 'headless-redirector';
     $version = '1.0.0';
@@ -68,4 +68,4 @@ function run_headless_redirector() {
     $loader->run();
 }
 
-run_headless_redirector();
+hr_run_plugin();

@@ -28,85 +28,140 @@ class Headless_Redirector_Redirect {
             return;
         }
 
+        // Validate Request
+        if ( ! isset( $_SERVER['REQUEST_URI'] ) ) {
+            return;
+        }
+
+        $request_uri = sanitize_text_field( wp_unslash( $_SERVER['REQUEST_URI'] ) );
+
         // Avoid redirecting Login (Critical Safety)
-        if ( stripos( $_SERVER['REQUEST_URI'], 'wp-login.php' ) !== false ) {
+        if ( stripos( $request_uri, 'wp-login.php' ) !== false ) {
             return;
         }
 
         // Avoid redirecting REST API (Critical Safety)
-        if ( stripos( $_SERVER['REQUEST_URI'], 'wp-json' ) !== false || stripos( $_SERVER['REQUEST_URI'], 'graphql' ) !== false ) {
+        if ( stripos( $request_uri, 'wp-json' ) !== false || stripos( $request_uri, 'graphql' ) !== false ) {
             return;
         }
 
         // Avoid redirecting Assets (Critical Safety)
-        if ( stripos( $_SERVER['REQUEST_URI'], 'wp-content' ) !== false || stripos( $_SERVER['REQUEST_URI'], 'wp-includes' ) !== false ) {
+        if ( stripos( $request_uri, 'wp-content' ) !== false || stripos( $request_uri, 'wp-includes' ) !== false ) {
             return;
         }
 
         // Avoid redirecting WP Cron (Critical Safety)
-        if ( stripos( $_SERVER['REQUEST_URI'], 'wp-cron.php' ) !== false ) {
+        if ( stripos( $request_uri, 'wp-cron.php' ) !== false ) {
             return;
         }
 
+        $strategy = get_option( 'hr_redirect_strategy', 'redirect' );
         $target_url = get_option( 'hr_target_url' );
-        $request_uri = $_SERVER['REQUEST_URI'];
         $mappings = get_option( 'hr_url_mappings', array() );
         $current_id = get_queried_object_id();
-        
-        // 1. Check Individual Mappings (Highest Priority) - Works even if Global Target is empty? 
-        // User said: "if those path which have single redirect path it will redirect to single path."
-        // We should allow individual redirects even if global target is missing? 
-        // Historically we returned if target_url is empty. But now we have mappings.
-        // Let's keep checking mappings first.
-        if ( $current_id && ! empty( $mappings[$current_id] ) ) {
-            wp_redirect( $mappings[$current_id], 301 );
-            exit;
-        }
-
-        // If no global target is set, we can't do global/full redirect.
-        if ( empty( $target_url ) ) {
-            return;
-        }
-
-        // 2. Check Exclusions (Unless Full Redirect Mode is ON)
         $full_redirect = get_option( 'hr_full_redirect_mode' ) === '1';
-
-        if ( ! $full_redirect ) {
-            $exclusions = array_filter( array_map( 'trim', explode( "\n", get_option( 'hr_excluded_paths' ) ) ) );
-            $exclusions[] = 'wp-admin'; 
-            $exclusions[] = 'wp-login';
-            
-            foreach ( $exclusions as $path ) {
-                if ( ! empty( $path ) && stripos( $request_uri, $path ) !== false ) {
-                    return;
+        
+        // ============================================================
+        // SIMPLIFIED LOGIC:
+        // 1. Check critical paths FIRST (always accessible, even in Full Redirect)
+        // 2. Check exclusions (only in normal mode, not Full Redirect)
+        // 3. Block Access mode = blocks everything (except critical paths & exclusions)
+        // 4. Redirect mode = individual mappings first, then global (respects exclusions)
+        // 5. Full Site Redirect = forces redirect, ignores exclusions (but respects critical paths)
+        // ============================================================
+        
+        // STEP 1: Check Critical Paths FIRST (always accessible in ALL modes)
+        $critical_paths = array_filter( array_map( 'trim', explode( "\n", get_option( 'hr_critical_paths', '' ) ) ) );
+        
+        foreach ( $critical_paths as $path ) {
+            if ( ! empty( $path ) ) {
+                // Check if wildcard is present
+                if ( strpos( $path, '*' ) !== false ) {
+                    // Wildcard matching: /blog/* matches /blog/anything
+                    $path_prefix = rtrim( str_replace( '*', '', $path ), '/' );
+                    $path_normalized = '/' . ltrim( $path_prefix, '/' );
+                    if ( strpos( $request_uri, $path_normalized ) === 0 ) {
+                        return;
+                    }
+                } else {
+                    // Exact matching: /about matches ONLY /about (with or without trailing slash)
+                    $path_normalized = '/' . ltrim( $path, '/' );
+                    // Strip query string from request URI for comparison
+                    $request_path = strtok( $request_uri, '?' );
+                    // Compare with and without trailing slash
+                    if ( rtrim( $request_path, '/' ) === rtrim( $path_normalized, '/' ) || 
+                         rtrim( $request_path, '/' ) === rtrim( $path, '/' ) ) {
+                        return;
+                    }
                 }
             }
-        } else {
-            // In Full Redirect Mode, we still MUST exclude wp-admin/login to prevent lockout
-            if ( stripos( $request_uri, 'wp-admin' ) !== false || stripos( $request_uri, 'wp-login' ) !== false ) {
-                return;
+        }
+        
+        // STEP 2: Check Exclusions (only if NOT in Full Redirect Mode)
+        if ( ! $full_redirect ) {
+            // Exclusions work in Block and Redirect modes
+            $exclusions = array_filter( array_map( 'trim', explode( "\n", get_option( 'hr_excluded_paths', '' ) ) ) );
+            
+            foreach ( $exclusions as $path ) {
+                if ( ! empty( $path ) ) {
+                    // Check if wildcard is present
+                    if ( strpos( $path, '*' ) !== false ) {
+                        // Wildcard matching: /blog/* matches /blog/anything
+                        $path_prefix = rtrim( str_replace( '*', '', $path ), '/' );
+                        $path_normalized = '/' . ltrim( $path_prefix, '/' );
+                        if ( strpos( $request_uri, $path_normalized ) === 0 ) {
+                            return;
+                        }
+                    } else {
+                        // Exact matching: /about matches ONLY /about (with or without trailing slash)
+                        $path_normalized = '/' . ltrim( $path, '/' );
+                        // Strip query string from request URI for comparison
+                        $request_path = strtok( $request_uri, '?' );
+                        // Compare with and without trailing slash
+                        if ( rtrim( $request_path, '/' ) === rtrim( $path_normalized, '/' ) || 
+                             rtrim( $request_path, '/' ) === rtrim( $path, '/' ) ) {
+                            return;
+                        }
+                    }
+                }
             }
         }
-
-        // 3. Fallback: Global Action
-        // If "Full Redirect" is ON, we are here (exclusions skipped).
-        // If "Full Redirect" is OFF, we are here (exclusions passed).
         
-        $strategy = get_option( 'hr_redirect_strategy', 'redirect' );
-
+        // STEP 3: Block Access Mode
         if ( $strategy === 'block' ) {
-            // Headless Mode: Block Access
+            // Block access to all frontend pages (after checking exclusions)
+            $message = '<h1>Access Denied</h1><p>This site is in headless mode.';
+            if ( ! empty( $target_url ) ) {
+                $message .= ' Please visit the <a href="' . esc_url( $target_url ) . '">frontend application</a>.';
+            }
+            $message .= '</p>';
+            
             wp_die( 
-                '<h1>Access Denied</h1><p>This site is in headless mode. Please visit the <a href="' . esc_url( $target_url ) . '">frontend application</a>.</p>', 
+                wp_kses_post( $message ), 
                 'Headless Mode', 
                 array( 'response' => 403 ) 
             );
             exit;
-        } else {
-            // Standard Mode: Redirect
-            wp_redirect( $target_url, 301 );
+        }
+        
+        // STEP 4: Check Individual URL Mappings (Highest Priority in Redirect Mode)
+        // Individual redirects work first, even before global redirect
+        if ( $current_id && ! empty( $mappings[$current_id] ) ) {
+            // phpcs:ignore WordPress.Security.SafeRedirect.wp_redirect_wp_redirect -- External redirect is the intended feature.
+            wp_redirect( $mappings[$current_id], 301 );
             exit;
         }
+        
+        // STEP 5: Check if we can do global redirect
+        // If no global target URL is set, we can't redirect
+        if ( empty( $target_url ) ) {
+            return;
+        }
+        
+        // STEP 6: Execute Global Redirect
+        // phpcs:ignore WordPress.Security.SafeRedirect.wp_redirect_wp_redirect -- External redirect is the intended feature.
+        wp_redirect( $target_url, 301 );
+        exit;
 	}
 
 }

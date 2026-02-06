@@ -8,6 +8,10 @@
  * @package    Headless_Redirector
  * @subpackage Headless_Redirector/admin/partials
  */
+
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
 ?>
 <div class="wrap">
     <h1><?php echo esc_html( get_admin_page_title() ); ?></h1>
@@ -30,15 +34,16 @@
     <form method="post" action="options.php">
         <?php
             // check for active tab
-            $active_tab = isset( $_GET[ 'tab' ] ) ? $_GET[ 'tab' ] : 'general';
+            // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Reading UI tab state only.
+            $hr_active_tab = isset( $_GET[ 'tab' ] ) ? sanitize_key( wp_unslash( $_GET[ 'tab' ] ) ) : 'general';
         ?>
         <h2 class="nav-tab-wrapper">
-            <a href="?page=headless-redirector&tab=general" class="nav-tab <?php echo $active_tab == 'general' ? 'nav-tab-active' : ''; ?>">General Settings</a>
-            <a href="?page=headless-redirector&tab=advanced" class="nav-tab <?php echo $active_tab == 'advanced' ? 'nav-tab-active' : ''; ?>">Advanced Options</a>
+            <a href="?page=headless-redirector&tab=general" class="nav-tab <?php echo $hr_active_tab === 'general' ? 'nav-tab-active' : ''; ?>">General Settings</a>
+            <a href="?page=headless-redirector&tab=advanced" class="nav-tab <?php echo $hr_active_tab === 'advanced' ? 'nav-tab-active' : ''; ?>">Advanced Options</a>
         </h2>
         
         <?php
-        if( $active_tab == 'general' ) {
+        if( $hr_active_tab === 'general' ) {
             settings_fields( 'hr_general_settings' );
             do_settings_sections( 'hr_general_settings' );
             ?>
@@ -52,13 +57,13 @@
                     <th scope="row">Routing Behavior</th>
                     <td>
                         <fieldset>
-                            <?php $strategy = get_option( 'hr_redirect_strategy', 'redirect' ); ?>
+                            <?php $hr_strategy = get_option( 'hr_redirect_strategy', 'redirect' ); ?>
                             <label style="display: block; margin-bottom: 8px;">
-                                <input type="radio" name="hr_redirect_strategy" value="redirect" <?php checked( 'redirect', $strategy ); ?> />
+                                <input type="radio" name="hr_redirect_strategy" value="redirect" <?php checked( 'redirect', $hr_strategy ); ?> />
                                 <strong>Redirect to Target URL</strong> <span class="description">(Standard)</span>
                             </label>
                             <label style="display: block;">
-                                <input type="radio" name="hr_redirect_strategy" value="block" <?php checked( 'block', $strategy ); ?> />
+                                <input type="radio" name="hr_redirect_strategy" value="block" <?php checked( 'block', $hr_strategy ); ?> />
                                 <strong>Block Access (Headless Mode)</strong> <span class="description">(Returns HTTP 403 Forbidden)</span>
                             </label>
                             <p class="description" style="margin-top: 8px;">
@@ -92,11 +97,13 @@
                     </td>
                 </tr>
                 <tr valign="top">
-                    <th scope="row">Exclusion List</th>
+                    <th scope="row">Exclude Redirect Paths</th>
                     <td>
                         <textarea name="hr_excluded_paths" rows="5" class="large-text code"><?php echo esc_textarea( get_option('hr_excluded_paths') ); ?></textarea>
                         <p class="description">
-                            Add paths or keywords to exclude from redirection (one per line).<br>
+                            Add paths to exclude from redirection or blocking (one per line).<br>
+                            <strong>Wildcard:</strong> Use <code>*</code> for pattern matching. Example: <code>/blog/*</code> matches all blog posts.<br>
+                            <strong>Exact:</strong> Without <code>*</code>, only exact paths match. Example: <code>/about</code> matches ONLY <code>/about</code>.<br>
                             <em>Note: <code>wp-admin</code>, <code>wp-login</code>, and <code>wp-json</code> are automatically excluded.</em>
                         </p>
                     </td>
@@ -122,12 +129,33 @@
 
             <hr>
 
-            <h3>📍 URL Mapping</h3>
-            <?php $target_url = get_option( 'hr_target_url' ); ?>
+            <h3>🔒 Critical Paths</h3>
             <div class="hr-info-box">
-                <p>Map specific local posts/pages to specific remote URLs.
-                <?php if ( ! empty( $target_url ) ) : ?>
-                    By default, unmapped content redirects to: <code><?php echo esc_url( $target_url ); ?></code>
+                <p><strong>Critical Paths are ALWAYS accessible</strong>, even in Full Site Redirect mode. These paths will never be blocked or redirected, regardless of any other settings. You may can lose your site access if you remove these paths.</p>
+            </div>
+            <table class="form-table">
+                <tr valign="top">
+                    <th scope="row">Critical Paths</th>
+                    <td>
+                        <textarea name="hr_critical_paths" rows="7" class="large-text code"><?php echo esc_textarea( get_option('hr_critical_paths') ); ?></textarea>
+                        <p class="description">
+                            Add paths that should ALWAYS be accessible (one per line). These paths work in all modes, including Full Site Redirect.<br>
+                            <strong>Wildcard:</strong> Use <code>*</code> for pattern matching. Example: <code>/api/*</code> matches all API endpoints.<br>
+                            <strong>Exact:</strong> Without <code>*</code>, only exact paths match. Example: <code>/wp-login.php</code> matches ONLY that file.<br>
+                            <em>Recommended: <code>wp-admin/*</code>, <code>wp-login.php</code>, <code>wp-json/*</code>, <code>wp-content/*</code>, <code>wp-includes/*</code>, <code>wp-cron.php</code></em>
+                        </p>
+                    </td>
+                </tr>
+            </table>
+
+            <hr>
+
+            <h3>📍 URL Mapping</h3>
+            <?php $hr_target_url = get_option( 'hr_target_url' ); ?>
+            <div class="hr-info-box">
+                <p>Map specific local posts/pages to specific remote URLs. It has higher priority than the global Target URL.
+                <?php if ( ! empty( $hr_target_url ) ) : ?>
+                    By default, unmapped content redirects to: <code><?php echo esc_url( $hr_target_url ); ?></code>
                 <?php else: ?>
                     <strong style="color: #d63638;">Please set a Target URL in General Settings first.</strong>
                 <?php endif; ?>
@@ -145,33 +173,33 @@
                 <tbody>
                     <?php
                     // Fetch all public post types
-                    $post_types = get_post_types( array( 'public' => true ), 'names' );
-                    $args = array(
-                        'post_type' => $post_types,
+                    $hr_post_types = get_post_types( array( 'public' => true ), 'names' );
+                    $hr_args = array(
+                        'post_type' => $hr_post_types,
                         'posts_per_page' => 50, // Limit for V1
                         'post_status' => 'publish',
                     );
-                    $query = new WP_Query( $args );
-                    $mappings = get_option( 'hr_url_mappings', array() );
+                    $hr_query = new WP_Query( $hr_args );
+                    $hr_mappings = get_option( 'hr_url_mappings', array() );
                     
-                    if ( $query->have_posts() ) {
-                        while ( $query->have_posts() ) {
-                            $query->the_post();
-                            $id = get_the_ID();
-                            $target = isset( $mappings[$id] ) ? $mappings[$id] : '';
-                            $permalink = get_permalink();
-                            $path = wp_parse_url( $permalink, PHP_URL_PATH );
+                    if ( $hr_query->have_posts() ) {
+                        while ( $hr_query->have_posts() ) {
+                            $hr_query->the_post();
+                            $hr_id = get_the_ID();
+                            $hr_target = isset( $hr_mappings[$hr_id] ) ? $hr_mappings[$hr_id] : '';
+                            $hr_permalink = get_permalink();
+                            $hr_path = wp_parse_url( $hr_permalink, PHP_URL_PATH );
                             ?>
                             <tr>
-                                <td><code class="source-path"><?php echo esc_html( $path ); ?></code></td>
+                                <td><code class="source-path"><?php echo esc_html( $hr_path ); ?></code></td>
                                 <td>
-                                    <strong><a href="<?php echo get_edit_post_link( $id ); ?>"><?php the_title(); ?></a></strong>
+                                    <strong><a href="<?php echo esc_url( get_edit_post_link( $hr_id ) ); ?>"><?php echo esc_html( get_the_title() ); ?></a></strong>
                                     <br>
-                                    <small><?php echo ucfirst( get_post_type() ); ?></small> . 
+                                    <small><?php echo esc_html( ucfirst( get_post_type() ) ); ?></small> . 
                                     <a href="<?php the_permalink(); ?>" target="_blank" style="text-decoration: none;">🔗</a>
                                 </td>
                                 <td>
-                                    <input type="url" name="hr_url_mappings[<?php echo $id; ?>]" value="<?php echo esc_url( $target ); ?>" placeholder="https://..." />
+                                    <input type="url" name="hr_url_mappings[<?php echo esc_attr( $hr_id ); ?>]" value="<?php echo esc_url( $hr_target ); ?>" placeholder="https://..." />
                                 </td>
                             </tr>
                             <?php
@@ -210,7 +238,7 @@
         function handleStrategyChange() {
              var strategy = $strategyRadios.filter(':checked').val();
              if ( strategy === 'block' ) {
-                 $wrapper.slideUp();
+                 $wrapper.hide();
                  // Deselect "Enable Redirect" as requested
                  if( $enableCheckbox.is(':checked') ) {
                      $enableCheckbox.prop('checked', false);
@@ -218,7 +246,7 @@
                  // Disable it to prevent confusion
                  // $enableCheckbox.prop('disabled', true); 
              } else {
-                 $wrapper.slideDown();
+                 $wrapper.show();
                  validateUrlRequired();
              }
         }

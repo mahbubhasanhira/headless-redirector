@@ -10,6 +10,10 @@
  * @subpackage Headless_Redirector/includes
  */
 
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 class Headless_Redirector_Loader {
 
 	protected $actions;
