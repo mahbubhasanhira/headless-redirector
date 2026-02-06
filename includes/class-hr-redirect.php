@@ -43,6 +43,11 @@ class Headless_Redirector_Redirect {
             return;
         }
 
+        // Avoid redirecting WP Cron (Critical Safety)
+        if ( stripos( $_SERVER['REQUEST_URI'], 'wp-cron.php' ) !== false ) {
+            return;
+        }
+
         $target_url = get_option( 'hr_target_url' );
         $request_uri = $_SERVER['REQUEST_URI'];
         $mappings = get_option( 'hr_url_mappings', array() );
@@ -83,11 +88,25 @@ class Headless_Redirector_Redirect {
             }
         }
 
-        // 3. Fallback: Global Redirect
+        // 3. Fallback: Global Action
         // If "Full Redirect" is ON, we are here (exclusions skipped).
         // If "Full Redirect" is OFF, we are here (exclusions passed).
-        wp_redirect( $target_url, 301 );
-        exit;
+        
+        $strategy = get_option( 'hr_redirect_strategy', 'redirect' );
+
+        if ( $strategy === 'block' ) {
+            // Headless Mode: Block Access
+            wp_die( 
+                '<h1>Access Denied</h1><p>This site is in headless mode. Please visit the <a href="' . esc_url( $target_url ) . '">frontend application</a>.</p>', 
+                'Headless Mode', 
+                array( 'response' => 403 ) 
+            );
+            exit;
+        } else {
+            // Standard Mode: Redirect
+            wp_redirect( $target_url, 301 );
+            exit;
+        }
 	}
 
 }

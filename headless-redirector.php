@@ -4,6 +4,7 @@
  * Plugin URI:        https://github.com/mahbubhasanhira/headless-redirector
  * Description:       The essential gateway for headless WordPress. Redirects frontend traffic to your external site while white-listing Admin, Login, and API paths.
  * Version:           1.0.0
+ * Requires at least: 6.3
  * Requires PHP:      7.4
  * Author:            Mahbub Hasan Hira
  * Author URI:        https://mahbubhasanhira.com/

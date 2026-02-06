@@ -46,24 +46,49 @@
                 <p>Configure where your WordPress traffic should go. These settings act as the global default for your headless setup.</p>
             </div>
 
+            <!-- redirect options table -->
             <table class="form-table">
+                <tr valign="top">
+                    <th scope="row">Routing Behavior</th>
+                    <td>
+                        <fieldset>
+                            <?php $strategy = get_option( 'hr_redirect_strategy', 'redirect' ); ?>
+                            <label style="display: block; margin-bottom: 8px;">
+                                <input type="radio" name="hr_redirect_strategy" value="redirect" <?php checked( 'redirect', $strategy ); ?> />
+                                <strong>Redirect to Target URL</strong> <span class="description">(Standard)</span>
+                            </label>
+                            <label style="display: block;">
+                                <input type="radio" name="hr_redirect_strategy" value="block" <?php checked( 'block', $strategy ); ?> />
+                                <strong>Block Access (Headless Mode)</strong> <span class="description">(Returns HTTP 403 Forbidden)</span>
+                            </label>
+                            <p class="description" style="margin-top: 8px;">
+                                - <strong>Redirect</strong>: Sends visitors to your Target URL.<br>
+                                - <strong>Block</strong>: Shows an error message to visitors (useful for API-only sites).<br>
+                                <em>Note: Admin, Login, and API paths are always accessible in both modes.</em>
+                            </p>
+                        </fieldset>
+                    </td>
+                </tr>
+            <!-- redirect options table -->
+            <div id="hr-redirect-options-wrapper">
+            <table class="form-table">
+                 <tr valign="top">
+                    <th scope="row">Target URL</th>
+                    <td>
+                        <input type="url" name="hr_target_url" value="<?php echo esc_attr( get_option('hr_target_url') ); ?>" class="regular-text" placeholder="https://your-targeted-site.com" />
+                        <p class="description">Enter the full URL of your targeted site.</p>
+                    </td>
+                </tr>
                 <tr valign="top">
                     <th scope="row">Enable Redirect</th>
                     <td>
                         <fieldset>
                             <label for="hr_enabled">
-                                <input type="checkbox" name="hr_enabled" value="1" <?php checked( 1, get_option( 'hr_enabled' ), true ); ?> />
+                                <input type="checkbox" id='hr_enabled' name="hr_enabled" value="1" <?php checked( 1, get_option( 'hr_enabled' ), true ); ?> />
                                 <strong>Activate Redirection</strong>
                             </label>
                             <p class="description">Turn this on to start diverting you traffic to the target site.</p>
                         </fieldset>
-                    </td>
-                </tr>
-                <tr valign="top">
-                    <th scope="row">Target URL</th>
-                    <td>
-                        <input type="url" name="hr_target_url" value="<?php echo esc_attr( get_option('hr_target_url') ); ?>" class="regular-text" placeholder="https://your-targeted-site.com" />
-                        <p class="description">Enter the full URL of your targeted site.</p>
                     </td>
                 </tr>
                 <tr valign="top">
@@ -77,6 +102,7 @@
                     </td>
                 </tr>
             </table>
+            </div>
             <?php
             submit_button();
         } else {
@@ -168,36 +194,44 @@
         var $urlInput = $('input[name="hr_target_url"]');
         var $enableCheckbox = $('input[name="hr_enabled"]');
         var $fullRedirectCheckbox = $('input[name="hr_full_redirect_mode"]');
+        var $strategyRadios = $('input[name="hr_redirect_strategy"]');
+        var $wrapper = $('#hr-redirect-options-wrapper');
 
         function validateUrlRequired() {
             var url = $urlInput.val();
+            // In Redirect mode, URL is required to enable. In Block mode, Enable is forced off anyway.
             if( !url ) {
                 $enableCheckbox.prop('disabled', true);
-                $fullRedirectCheckbox.prop('disabled', true);
-                if( $enableCheckbox.is(':checked') || $fullRedirectCheckbox.is(':checked') ) {
-                     // Optionally uncheck or show warning? 
-                     // users might be confused if we uncheck automatically on load if they just cleared it.
-                     // But strictly speaking, if no URL, these should be off.
-                }
             } else {
                 $enableCheckbox.prop('disabled', false);
-                $fullRedirectCheckbox.prop('disabled', false);
             }
         }
 
-        // Run on load if on general tab (url input exists)
+        function handleStrategyChange() {
+             var strategy = $strategyRadios.filter(':checked').val();
+             if ( strategy === 'block' ) {
+                 $wrapper.slideUp();
+                 // Deselect "Enable Redirect" as requested
+                 if( $enableCheckbox.is(':checked') ) {
+                     $enableCheckbox.prop('checked', false);
+                 }
+                 // Disable it to prevent confusion
+                 // $enableCheckbox.prop('disabled', true); 
+             } else {
+                 $wrapper.slideDown();
+                 validateUrlRequired();
+             }
+        }
+
+        // Init
+        if( $strategyRadios.length ) {
+            $strategyRadios.on('change', handleStrategyChange);
+            handleStrategyChange(); // Run on load
+        }
+
         if( $urlInput.length ) {
-            validateUrlRequired();
             $urlInput.on('input change', validateUrlRequired);
         }
-        
-        // If on Advanced tab, we might not have the URL input present on page to check?
-        // Actually, settings are saved. If they are on Advanced tab, they can toggle Full Redirect.
-        // We might need to check the value from DB or pass it via PHP.
-        // For V1 complexity, let's rely on General tab validation or server-side if possible.
-        // But user specifically asked for "when user checked ... they first set the targeted url".
-        // This usually implies the flow in General tab.
-        
     });
     </script>
 </div>

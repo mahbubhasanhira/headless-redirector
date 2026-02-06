@@ -1,7 +1,7 @@
 === Headless Redirector ===
 Contributors: mahbubhasanhira
 Tags: headless, redirect, jamstack, nextjs, gatsby
-Requires at least: 5.6
+Requires at least: 6.3
 Tested up to: 6.7
 Requires PHP: 7.4
 Stable tag: 1.0.0

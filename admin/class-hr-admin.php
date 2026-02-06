@@ -44,6 +44,7 @@ class Headless_Redirector_Admin {
     public function register_settings() {
         // General Group
         register_setting( 'hr_general_settings', 'hr_enabled' );
+        register_setting( 'hr_general_settings', 'hr_redirect_strategy' ); // New setting
         register_setting( 'hr_general_settings', 'hr_target_url', 'esc_url_raw' );
         register_setting( 'hr_general_settings', 'hr_excluded_paths', 'sanitize_textarea_field' );
         
