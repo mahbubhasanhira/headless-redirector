@@ -2,7 +2,7 @@
 Contributors: mahbubhasanhira
 Tags: headless, redirect, jamstack, nextjs, gatsby
 Requires at least: 6.3
-Tested up to: 7.0
+Tested up to: 6.9
 Requires PHP: 7.4
 Stable tag: 1.0.0
 License: GPLv2 or later
